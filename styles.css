@@ -1,0 +1,155 @@
+:root {
+  --bg-a: #07233b;
+  --bg-b: #1a4f79;
+  --hud-bg: rgba(8, 17, 28, 0.58);
+  --hud-border: rgba(255, 255, 255, 0.35);
+  --text: #f4fbff;
+  --accent: #ffd54f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 20% 0%, #2b78ad 0%, var(--bg-a) 38%, #04101a 100%);
+}
+
+.app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  filter: saturate(1.04) contrast(1.05);
+}
+
+#gameCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hud {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  display: flex;
+  gap: 0.6rem;
+  z-index: 4;
+}
+
+.pill {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--hud-border);
+  border-radius: 999px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(4px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.controls {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 34rem);
+  padding: 1rem 1.1rem 1.2rem;
+  border: 1px solid var(--hud-border);
+  border-radius: 1rem;
+  background: rgba(5, 20, 34, 0.84);
+  text-align: center;
+}
+
+.controls h1 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.2rem, 2vw, 2rem);
+}
+
+.controls p {
+  margin: 0 0 0.95rem;
+  opacity: 0.9;
+}
+
+.difficulty-picker {
+  display: flex;
+  gap: 0.7rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.diff-btn {
+  border: 0;
+  border-radius: 1rem;
+  padding: 0.8rem 1.6rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  cursor: pointer;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: transform 0.12s, filter 0.12s;
+}
+
+.diff-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+}
+
+.diff-easy {
+  background: linear-gradient(135deg, #43aa8b, #6dd5a0);
+  color: #053020;
+}
+
+.diff-medium {
+  background: linear-gradient(135deg, #ffd54f, #ffed95);
+  color: #05243b;
+}
+
+.diff-hard {
+  background: linear-gradient(135deg, #f94144, #ff6b6b);
+  color: #2a0505;
+}
+
+.status {
+  position: absolute;
+  z-index: 5;
+  right: 0.9rem;
+  bottom: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 0.92rem;
+  min-width: 10ch;
+}
+
+@media (max-width: 640px) {
+  .hud {
+    left: 0.5rem;
+    top: 0.5rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    padding: 0.42rem 0.66rem;
+    font-size: 0.9rem;
+  }
+}
