@@ -27,7 +27,10 @@ let levelStartAt = 0;
 let levelDurationMs = 0;
 let combo = 0;
 let comboUntil = 0;
-let pointer = { x: -9999, y: -9999, active: false };
+let pointers = [
+  { x: -9999, y: -9999, active: false },
+  { x: -9999, y: -9999, active: false },
+];
 let usingMouse = true;
 let handReady = false;
 let audioCtx = null;
@@ -153,18 +156,18 @@ function drawBalloon(balloon, t) {
 }
 
 function drawPointer() {
-  if (!pointer.active) {
-    return;
-  }
-  ctx.beginPath();
-  ctx.arc(pointer.x, pointer.y, 12, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255, 213, 79, 0.22)";
-  ctx.fill();
+  for (const p of pointers) {
+    if (!p.active) continue;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 213, 79, 0.22)";
+    ctx.fill();
 
-  ctx.beginPath();
-  ctx.arc(pointer.x, pointer.y, 5, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffd54f";
-  ctx.fill();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffd54f";
+    ctx.fill();
+  }
 }
 
 function burst(x, y, color) {
@@ -360,34 +363,36 @@ function drawArcadeBanner(now) {
   ctx.fillText("Get ready...", width / 2, height / 2 + 25);
 }
 
-function popAtPointer(now) {
-  if (!pointer.active) {
-    return;
-  }
-  for (let i = balloons.length - 1; i >= 0; i -= 1) {
-    const b = balloons[i];
-    const dx = pointer.x - b.x;
-    const dy = pointer.y - b.y;
-    const d2 = dx * dx + dy * dy;
-    const hitR = b.radius * difficulty.hitMul;
-    if (d2 <= hitR * hitR) {
-      burst(b.x, b.y, b.color);
-      playPopSound(Math.max(0.8, b.radius / 34));
-      balloons.splice(i, 1);
-      pops += 1;
-      if (now <= comboUntil) {
-        combo += 1;
-      } else {
-        combo = 1;
+function popAtPointers(now) {
+  let popped = false;
+  for (const p of pointers) {
+    if (!p.active) continue;
+    for (let i = balloons.length - 1; i >= 0; i -= 1) {
+      const b = balloons[i];
+      const dx = p.x - b.x;
+      const dy = p.y - b.y;
+      const d2 = dx * dx + dy * dy;
+      const hitR = b.radius * difficulty.hitMul;
+      if (d2 <= hitR * hitR) {
+        burst(b.x, b.y, b.color);
+        playPopSound(Math.max(0.8, b.radius / 34));
+        balloons.splice(i, 1);
+        pops += 1;
+        if (now <= comboUntil) {
+          combo += 1;
+        } else {
+          combo = 1;
+        }
+        comboUntil = now + 850;
+        score += 8 + combo * 2;
+        updateHud();
+        statusEl.textContent = combo > 1 ? `Combo x${combo}` : "Nice pop!";
+        popped = true;
+        break;
       }
-      comboUntil = now + 850;
-      score += 8 + combo * 2;
-      updateHud();
-      statusEl.textContent = combo > 1 ? `Combo x${combo}` : "Nice pop!";
-      break;
     }
   }
-  if (now - lastSpawnAt > 1200) {
+  if (!popped && now - lastSpawnAt > 1200) {
     statusEl.textContent = "Track a balloon with your fingertip.";
   }
 }
@@ -429,7 +434,7 @@ function tick(now) {
   }
 
   if (!gameOver && mode === "level") {
-    popAtPointer(now);
+    popAtPointers(now);
   }
 
   if (!gameOver && mode === "level" && now >= modeUntil && balloons.length === 0) {
@@ -483,13 +488,13 @@ function bindMouseFallback() {
     if (!usingMouse) {
       return;
     }
-    pointer.x = event.clientX;
-    pointer.y = event.clientY;
-    pointer.active = true;
+    pointers[0].x = event.clientX;
+    pointers[0].y = event.clientY;
+    pointers[0].active = true;
   });
   window.addEventListener("mouseleave", () => {
     if (usingMouse) {
-      pointer.active = false;
+      pointers[0].active = false;
     }
   });
 }
@@ -505,30 +510,35 @@ function initHands() {
   });
 
   hands.setOptions({
-    maxNumHands: 1,
+    maxNumHands: 2,
     modelComplexity: 1,
     minDetectionConfidence: 0.7,
     minTrackingConfidence: 0.65,
   });
 
   hands.onResults((results) => {
-    if (!results.multiHandLandmarks || !results.multiHandLandmarks.length) {
+    const landmarks = results.multiHandLandmarks || [];
+    if (!landmarks.length) {
       if (!usingMouse) {
-        pointer.active = false;
+        pointers[0].active = false;
+        pointers[1].active = false;
       }
-      return;
-    }
-
-    const tip = results.multiHandLandmarks[0][8];
-    if (!tip) {
       return;
     }
 
     usingMouse = false;
     handReady = true;
-    pointer.x = (1 - tip.x) * width;
-    pointer.y = tip.y * height;
-    pointer.active = true;
+
+    for (let h = 0; h < 2; h++) {
+      if (h < landmarks.length && landmarks[h][8]) {
+        const tip = landmarks[h][8];
+        pointers[h].x = (1 - tip.x) * width;
+        pointers[h].y = tip.y * height;
+        pointers[h].active = true;
+      } else {
+        pointers[h].active = false;
+      }
+    }
   });
 
   const handCam = new window.Camera(video, {
