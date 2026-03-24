@@ -1,6 +1,7 @@
 const video = document.getElementById("video");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const setupOverlay = document.getElementById("setupOverlay");
 const controls = document.getElementById("controls");
 const statusEl = document.getElementById("status");
 const scoreEl = document.getElementById("score");
@@ -8,6 +9,12 @@ const livesEl = document.getElementById("lives");
 const popsEl = document.getElementById("pops");
 const levelEl = document.getElementById("level");
 const timeLeftEl = document.getElementById("timeLeft");
+const cameraGroup = document.getElementById("cameraGroup");
+const difficultyGroup = document.getElementById("difficultyGroup");
+const startBtn = document.getElementById("startBtn");
+
+let selectedDeviceId = null;
+let previewStream = null;
 
 let width = 0;
 let height = 0;
@@ -552,11 +559,80 @@ function initHands() {
   handCam.start();
 }
 
+async function enumerateCameras() {
+  try {
+    // Request a temporary stream to trigger permission prompt, then enumerate
+    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    tempStream.getTracks().forEach((t) => t.stop());
+  } catch (_) {
+    // permission denied — we'll show whatever enumerateDevices returns
+  }
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter((d) => d.kind === "videoinput");
+
+  cameraGroup.innerHTML = "";
+  cameras.forEach((cam, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "toggle-btn";
+    btn.dataset.deviceId = cam.deviceId;
+    const label = (cam.label || `Camera ${i + 1}`).replace(/\s*\([0-9a-f:]{4,}\)\s*$/i, "").trim();
+    btn.textContent = label;
+    cameraGroup.appendChild(btn);
+  });
+
+  // Auto-select first camera
+  if (cameras.length > 0) {
+    selectCamera(cameras[0].deviceId);
+  }
+}
+
+async function startPreview(deviceId) {
+  // Stop any existing preview stream
+  if (previewStream) {
+    previewStream.getTracks().forEach((t) => t.stop());
+    previewStream = null;
+  }
+
+  try {
+    previewStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+    video.srcObject = previewStream;
+    await video.play();
+  } catch (err) {
+    console.error("Preview failed:", err);
+  }
+}
+
+function selectCamera(deviceId) {
+  selectedDeviceId = deviceId;
+  cameraGroup.querySelectorAll(".toggle-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.deviceId === deviceId);
+  });
+  startPreview(deviceId);
+  updateStartBtn();
+}
+
+function updateStartBtn() {
+  const hasDifficulty = difficultyGroup.querySelector(".toggle-btn.active") !== null;
+  startBtn.disabled = !(selectedDeviceId && hasDifficulty);
+}
+
 async function start() {
   try {
     ensureAudioReady();
+
+    // Stop preview stream — we'll use the same device for the game stream
+    if (previewStream) {
+      previewStream.getTracks().forEach((t) => t.stop());
+      previewStream = null;
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { deviceId: { exact: selectedDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     });
     video.srcObject = stream;
@@ -564,7 +640,7 @@ async function start() {
 
     resetGame();
     startLevel(performance.now());
-    controls.style.display = "none";
+    setupOverlay.style.display = "none";
     setStatus("Game live. Pop balloons with your finger.");
     initHands();
     setTimeout(() => {
@@ -573,21 +649,38 @@ async function start() {
       }
     }, 2800);
   } catch (err) {
-    controls.style.display = "block";
-    setStatus("Camera permission denied. Mouse fallback is active.");
+    setupOverlay.style.display = "flex";
+    setStatus("Camera error. Try another camera or check permissions.");
     console.error(err);
   }
 }
 
-window.addEventListener("resize", resize);
-document.querySelectorAll(".diff-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    difficulty = DIFFICULTY[btn.dataset.difficulty];
-    start();
-  });
+// --- Event listeners ---
+
+cameraGroup.addEventListener("click", (e) => {
+  const btn = e.target.closest(".toggle-btn");
+  if (!btn) return;
+  selectCamera(btn.dataset.deviceId);
 });
+
+difficultyGroup.addEventListener("click", (e) => {
+  const btn = e.target.closest(".toggle-btn");
+  if (!btn) return;
+  difficulty = DIFFICULTY[btn.dataset.difficulty];
+  difficultyGroup.querySelectorAll(".toggle-btn").forEach((b) => {
+    b.classList.toggle("active", b === btn);
+  });
+  updateStartBtn();
+});
+
+startBtn.addEventListener("click", () => {
+  if (!startBtn.disabled) start();
+});
+
+window.addEventListener("resize", resize);
 bindMouseFallback();
 resize();
 updateHud();
-setStatus("Pick a difficulty and allow camera access.");
+setStatus("Pick a camera and difficulty.");
 requestAnimationFrame(tick);
+enumerateCameras();
